@@ -46,5 +46,42 @@ public class AperiodicCommandTask implements Runnable {
         //     oprească taskul: publicați "ERROR <motiv>"
         //
         // Vezi exemplul exemple/01-taskuri/.../AperiodicTaskExample.java
+
+        try{
+            while(true){
+                String command = commands.take();
+                String[] parts = command.split(" ");
+                String reply = "";
+                try {
+                    switch (parts[0]) {
+                        case "RESET" -> {
+                            sensor.reset();
+                            reply = "OK RESET";
+                        }
+                        case "SET_INTERVAL" -> {
+                            periodic.setPeriodMs(Long.parseLong(parts[1]));
+                            reply = "OK SET_INTERVAL " + parts[1];
+                        }
+                        case "SET_THRESHOLD" -> {
+                            periodic.setThreshold(Double.parseDouble((parts[1])));
+                            reply = "OK SET_THRESHOLD " + parts[1];
+                        }
+                        case "STATUS" -> {
+                            reply = "OK STATUS " + periodic.getPeriodMs() + " " + periodic.getThreshold();
+                        }
+                        default -> {
+                            reply = "ERROR Comanda necunoscuta " + parts[0];
+                        }
+                    }
+                } catch (NumberFormatException | ArrayIndexOutOfBoundsException e){
+                    reply = "ERROR Parametru invalid sau lipsa";
+                }
+                String msg = deviceId + ";" + System.currentTimeMillis() + ";" + reply;
+                mqtt.publish(Config.statusTopic(deviceId), msg);
+            }
+        } catch (InterruptedException e){
+            Thread.currentThread().interrupt();
+        }
+
     }
 }

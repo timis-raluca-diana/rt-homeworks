@@ -1,5 +1,6 @@
 package ssatr.device;
 
+import java.util.Locale;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -18,11 +19,13 @@ public class SporadicAlarmTask implements Runnable {
     private final String deviceId;
     private final MqttConnection mqtt;
     private final BlockingQueue<Double> alarmEvents;
+    private final PeriodicTelemetryTask periodic;
 
-    public SporadicAlarmTask(String deviceId, MqttConnection mqtt, BlockingQueue<Double> alarmEvents) {
+    public SporadicAlarmTask(String deviceId, MqttConnection mqtt, BlockingQueue<Double> alarmEvents, PeriodicTelemetryTask periodic) {
         this.deviceId = deviceId;
         this.mqtt = mqtt;
         this.alarmEvents = alarmEvents;
+        this.periodic = periodic;
     }
 
     @Override
@@ -37,5 +40,27 @@ public class SporadicAlarmTask implements Runnable {
         //      citit din PeriodicTelemetryTask; alegeți și justificați în raport)
         //
         // Vezi exemplul exemple/01-taskuri/.../SporadicTaskExample.java
+
+        long lastRelease = 0;
+        try {
+            while(true) {
+                double t = alarmEvents.take();
+                long now = System.currentTimeMillis();
+                long sinceLast = now - lastRelease;
+                if(sinceLast < MIN_INTERARRIVAL_MS){
+                    System.out.println("Eveniment respins.");
+                    continue;
+                }
+                lastRelease = now;
+                double p = periodic.getThreshold();
+                String temp = String.format(Locale.US, "%.2f", t);
+                String prag = String.format(Locale.US, "%.2f", p);
+                String msg = deviceId + ";" + System.currentTimeMillis() + ";" + temp + ";" + prag;
+                mqtt.publish(Config.alarmTopic(deviceId), msg);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
     }
 }
